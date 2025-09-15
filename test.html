@@ -144,7 +144,7 @@
               <option value="3">3回（短間隔）</option>
             </select>
           </div>
-          <div class="chips"><span class="chip">WebAudio合成（ファイル不要）</span><span class="chip">ユーザー操作で解禁必須</span></div>
+          <div class="chips"><span class="chip">MP3（WebAudio再生）</span><span class="chip">ユーザー操作で解禁必須</span></div>
         </div>
       </div>
     </div>
@@ -163,94 +163,58 @@
   const $$ = (q)=>Array.from(document.querySelectorAll(q));
   const fmt = (t)=>String(t).padStart(2,'0');
 
-  // ---- Audio Synth (no external file) ----
+  // ---- Audio (WebAudio) ----
   let AC; let outputGain; let audioUnlocked = false;
   function ensureAudio(){
     if(!AC){ AC = new (window.AudioContext||window.webkitAudioContext)({latencyHint:'interactive'}); }
     if(!outputGain){ outputGain = AC.createGain(); outputGain.gain.value = parseFloat($('#volume').value); outputGain.connect(AC.destination); }
   }
-  function unlockAudio(){
+  async function unlockAudio(){
     ensureAudio();
+    try{ await AC.resume(); }catch(_){}
+    // 触った実績（iOS用・無音クリック）
     const osc = AC.createOscillator();
     const g = AC.createGain(); g.gain.value = 0; osc.connect(g).connect(AC.destination); osc.start(); osc.stop(AC.currentTime+0.01);
     audioUnlocked = true; updateAudioState();
   }
   function updateAudioState(){ $('#audioState').textContent = audioUnlocked? '🔊 Audio ready':'🔒 Audio locked'; }
 
-    // Slight pitch bend attack for realism
-    const bend = AC.createOscillator(); bend.type='sine'; bend.frequency.setValueAtTime(40, now);
-    const bg = AC.createGain(); bg.gain.setValueAtTime(0.002, now);
-    bg.gain.exponentialRampToValueAtTime(1e-5, now+0.3);
-    bend.connect(bg).connect(master); bend.start(now); bend.stop(now+0.4);
+  // ==== mp3 を WebAudio で鳴らす版 ====
+  let bellBuffer = null;
 
-    // Strike envelope (master)
-    const v = parseFloat($('#volume').value);
-    master.gain.setValueAtTime(0, now);
-    master.gain.linearRampToValueAtTime(v, now+0.01);
-    master.gain.exponentialRampToValueAtTime(1e-4, now+duration);
+  // mp3 を読み込み＆デコード（unlock 後に呼ぶ）
+  async function loadBellMP3() {
+    ensureAudio(); // AC を用意
+    const res = await fetch('bell.mp3', { cache: 'force-cache' });
+    if (!res.ok) throw new Error('bell.mp3 が読み込めませんでした');
+    const arr = await res.arrayBuffer();
+    bellBuffer = await AC.decodeAudioData(arr);
   }
-let bellAudio;
 
-function loadBell(){
-  bellAudio = new Audio("bell.mp3"); // 同じフォルダに bell.mp3 を置く
-  bellAudio.preload = "auto";
-}
+  // 実際に鳴らす。strike(打数)、volume、間隔(秒)はUIから取得
+  function bellPlay() {
+    if (!bellBuffer) { console.warn('bellBuffer 未ロード'); return; }
 
-// ==== mp3 を WebAudio で鳴らす版 ====
+    const hit = parseInt($('#strike').value, 10);
+    const vol = parseFloat($('#volume').value);
+    const gap = 0.6; // 2打目以降の間隔（秒）
 
-// 既存の合成用 bellStrike/bellPlay は使わないので削除 or 退避
-// 代わりに AudioBuffer を使う
-let bellBuffer = null;
+    const now = AC.currentTime;
+    for (let i = 0; i < hit; i++) {
+      const src = AC.createBufferSource();
+      src.buffer = bellBuffer;
 
-// mp3 を読み込み＆デコード（unlock 後に呼ぶ）
-async function loadBellMP3() {
-  ensureAudio(); // AC を用意
-  const res = await fetch('bell.mp3', { cache: 'force-cache' });
-  if (!res.ok) throw new Error('bell.mp3 が読み込めませんでした');
-  const arr = await res.arrayBuffer();
-  bellBuffer = await AC.decodeAudioData(arr);
-}
+      // 個別の音量ゲイン
+      const g = AC.createGain();
+      g.gain.value = vol;
+      src.connect(g).connect(AC.destination);
 
-// 実際に鳴らす。strike(打数)、volume、間隔(秒)はUIから取得
-function bellPlay() {
-  if (!bellBuffer) { console.warn('bellBuffer 未ロード'); return; }
-
-  const hit = parseInt($('#strike').value, 10);
-  const vol = parseFloat($('#volume').value);
-  const gap = 0.6; // 2打目以降の間隔（秒）
-
-  const now = AC.currentTime;
-  for (let i = 0; i < hit; i++) {
-    const src = AC.createBufferSource();
-    src.buffer = bellBuffer;
-
-    // 個別の音量ゲイン
-    const g = AC.createGain();
-    g.gain.value = vol;
-    src.connect(g).connect(AC.destination);
-
-    // ずれにくいように WebAudio の時間でスケジューリング
-    src.start(now + i * gap);
+      // WebAudio の時間で正確にスケジューリング
+      src.start(now + i * gap);
+    }
   }
-}
 
-// 既存の「音を解禁」処理に、mp3ロードを追加（1回だけでOK）
-$('#unlockAudio').onclick = async () => {
-  unlockAudio();          // 既存：AudioContext を解禁
-  try {
-    await loadBellMP3();  // mp3 をデコード
-    // 解禁直後に1発鳴らしておくと安心（任意）
-    bellPlay();
-  } catch (e) {
-    alert('ベル音の読み込みに失敗しました。bell.mp3 の配置を確認してください。');
-    console.error(e);
-  }
-};
-
-
-window.addEventListener("load", loadBell);
-
-
+  // 音量スライダ変化時（出力ゲインは主に合成音用。mp3は個別ゲインで対応）
   $('#volume').addEventListener('input',()=>{ ensureAudio(); if(outputGain) outputGain.gain.value=parseFloat($('#volume').value); });
 
   // ---- Wake Lock (Screen on) ----
@@ -273,7 +237,7 @@ window.addEventListener("load", loadBell);
 
   // ---- Schedule model ----
   /** Each entry: { whenMs: epochMillis, label: string, type: 'abs'|'offset' } */
-  let schedule=[]; // relative offsets will be resolved on start
+  let schedule=[];
 
   function addOffset(min,sec){
     const t = Math.max(0,(min|0)*60 + (sec|0));
@@ -304,14 +268,9 @@ window.addEventListener("load", loadBell);
     updateNextInfo();
   }
   function sortSchedule(){
-    schedule.sort((a,b)=>{
-      const av = a.type==='offset'? a.whenMs : a.whenMs; // both comparable
-      const bv = b.type==='offset'? b.whenMs : b.whenMs;
-      return av-bv;
-    });
+    schedule.sort((a,b)=> a.whenMs - b.whenMs );
     renderSchedule();
   }
-
   function btn(txt, cls, on){ const b=document.createElement('button'); b.className='btn '+cls; b.textContent=txt; b.onclick=on; return b; }
 
   // ---- Presets (localStorage) ----
@@ -339,7 +298,6 @@ window.addEventListener("load", loadBell);
   $('#savePreset').onclick=()=>{
     const name = ($('#presetName').value||'無題').trim();
     const list = loadPresets();
-    // overwrite if same name
     const i = list.findIndex(p=>p.name===name);
     const data = schedule.map(x=>({...x}));
     const item = {name, data, savedAt: Date.now()};
@@ -388,7 +346,7 @@ window.addEventListener("load", loadBell);
 
     resolved.forEach((r,i)=>{
       const delay = Math.max(0, r.at - now);
-      const id = setTimeout(()=>{ bellPlay(); updateNextInfo(); if(i===resolved.length-1){ /* last bell */ } }, delay);
+      const id = setTimeout(()=>{ bellPlay(); updateNextInfo(); }, delay);
       timers.push(id);
     });
 
@@ -407,16 +365,35 @@ window.addEventListener("load", loadBell);
 
     if(!list.length){ root.innerHTML='<span class="chip">次のベル：なし</span>'; return; }
     const next=list[0];
-    const mins = Math.max(0, Math.round((next.at-now)/1000));
-    root.innerHTML = `<span class="chip">次のベル：${next.label}</span><span class="chip">あと ${fmt(Math.floor(mins/60))}:${fmt(mins%60)}</span><span class="chip">残り ${list.length} 回</span>`;
+    const secs = Math.max(0, Math.round((next.at-now)/1000));
+    root.innerHTML = `<span class="chip">次のベル：${next.label}</span><span class="chip">あと ${fmt(Math.floor(secs/60))}:${fmt(secs%60)}</span><span class="chip">残り ${list.length} 回</span>`;
   }
 
   // Controls
-  $('#unlockAudio').onclick=()=>{ unlockAudio(); bellPlay(); };
-  $('#testBell').onclick=()=>{ if(!audioUnlocked) unlockAudio(); bellPlay(); };
+  // 「音を解禁」で AudioContext を解禁して mp3 をロード
+  $('#unlockAudio').onclick = async () => {
+    await unlockAudio();
+    if (!bellBuffer) {
+      try { await loadBellMP3(); bellPlay(); }
+      catch (e) { alert('ベル音の読み込みに失敗しました。bell.mp3 の配置を確認してください。'); console.error(e); }
+    } else {
+      bellPlay();
+    }
+  };
+
+  // テストベル
+  $('#testBell').onclick = async () => {
+    if(!audioUnlocked) await unlockAudio();
+    if (!bellBuffer) {
+      try { await loadBellMP3(); } 
+      catch (e) { alert('ベル音の読み込みに失敗しました。bell.mp3 の配置を確認してください。'); return; }
+    }
+    bellPlay();
+  };
 
   $('#start').onclick=()=>{
     if(!audioUnlocked){ alert('最初に「音を解禁」をタップしてください。'); return; }
+    if(!bellBuffer){ alert('ベル音が未ロードです。音を解禁→テストで確認してね。'); return; }
     running=true; paused=false; startEpoch=Date.now(); updateClock(); requestWakeLock(); scheduleTimers();
   };
   $('#pause').onclick=()=>{
@@ -426,14 +403,13 @@ window.addEventListener("load", loadBell);
 
   // Schedule UI events
   $('#addOffset').onclick=()=>{
-    const m = parseInt($('#mm').value||'0',10); const s=parseInt($('#ss').value||'0',10); if(isNaN(m)||isNaN(s)) return; addOffset(m,s); $('#mm').value=''; $('#ss').value=''; };
-
+    const m = parseInt($('#mm').value||'0',10); const s=parseInt($('#ss').value||'0',10); if(isNaN(m)||isNaN(s)) return; addOffset(m,s); $('#mm').value=''; $('#ss').value='';
+  };
   $('#genEvery').onclick=()=>{
     const minStr = prompt('間隔（分）例: 5'); if(minStr==null) return; const mins=parseFloat(minStr);
     const countStr= prompt('回数 例: 6'); if(countStr==null) return; const cnt=parseInt(countStr,10);
     if(!(mins>0 && cnt>0)) return; for(let i=1;i<=cnt;i++){ addOffset(mins*i,0); }
   };
-
   $('#addAbs').onclick=()=>{ const t=$('#absTime').value; if(!t) return; addAbsolute(t); };
   $('#clearSchedule').onclick=()=>{ if(confirm('スケジュールを全て削除しますか？')){ schedule=[]; renderSchedule(); } };
   $('#sortSchedule').onclick=sortSchedule;
@@ -448,11 +424,8 @@ window.addEventListener("load", loadBell);
 
   // init
   renderPresets(); renderSchedule(); updateAudioState(); updateWakeLabel();
-
-  // visibility change: re-request wake lock if needed
   document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible' && running){ requestWakeLock(); } });
 })();
 </script>
 </body>
 </html>
-
