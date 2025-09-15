@@ -144,7 +144,7 @@
               <option value="3">3回（短間隔）</option>
             </select>
           </div>
-          <div class="chips"><span class="chip">m4a（WebAudio再生）</span><span class="chip">ユーザー操作で解禁必須</span></div>
+          <div class="chips"><span class="chip">mp3（WebAudio再生）</span><span class="chip">ユーザー操作で解禁必須</span></div>
         </div>
       </div>
     </div>
@@ -179,14 +179,14 @@
   }
   function updateAudioState(){ $('#audioState').textContent = audioUnlocked? '🔊 Audio ready':'🔒 Audio locked'; }
 
-  // ==== m4a を WebAudio で鳴らす版 ====
+  // ==== mp3 を WebAudio で鳴らす版 ====
   let bellBuffer = null;
 
-  // m4a を読み込み＆デコード（unlock 後に呼ぶ）
-  async function loadBellm4a() {
+  // mp3 を読み込み＆デコード（unlock 後に呼ぶ）
+  async function loadBellmp3() {
     ensureAudio(); // AC を用意
-    const res = await fetch('bell.m4a', { cache: 'force-cache' });
-    if (!res.ok) throw new Error('bell.m4a が読み込めませんでした');
+    const res = await fetch('bell.mp3', { cache: 'force-cache' });
+    if (!res.ok) throw new Error('bell.mp3 が読み込めませんでした');
     const arr = await res.arrayBuffer();
     bellBuffer = await AC.decodeAudioData(arr);
   }
@@ -214,7 +214,7 @@
     }
   }
 
-  // 音量スライダ変化時（出力ゲインは主に合成音用。m4aは個別ゲインで対応）
+  // 音量スライダ変化時（出力ゲインは主に合成音用。mp3は個別ゲインで対応）
   $('#volume').addEventListener('input',()=>{ ensureAudio(); if(outputGain) outputGain.gain.value=parseFloat($('#volume').value); });
 
   // ---- Wake Lock (Screen on) ----
@@ -370,12 +370,12 @@
   }
 
   // Controls
-  // 「音を解禁」で AudioContext を解禁して m4a をロード
+  // 「音を解禁」で AudioContext を解禁して mp3 をロード
   $('#unlockAudio').onclick = async () => {
     await unlockAudio();
     if (!bellBuffer) {
-      try { await loadBellm4a(); bellPlay(); }
-      catch (e) { alert('ベル音の読み込みに失敗しました。bell.m4a の配置を確認してください。'); console.error(e); }
+      try { await loadBellmp3(); bellPlay(); }
+      catch (e) { alert('ベル音の読み込みに失敗しました。bell.mp3 の配置を確認してください。'); console.error(e); }
     } else {
       bellPlay();
     }
@@ -385,8 +385,8 @@
   $('#testBell').onclick = async () => {
     if(!audioUnlocked) await unlockAudio();
     if (!bellBuffer) {
-      try { await loadBellm4a(); } 
-      catch (e) { alert('ベル音の読み込みに失敗しました。bell.m4a の配置を確認してください。'); return; }
+      try { await loadBellmp3(); } 
+      catch (e) { alert('ベル音の読み込みに失敗しました。bell.mp3 の配置を確認してください。'); return; }
     }
     bellPlay();
   };
@@ -429,4 +429,5 @@
 </script>
 </body>
 </html>
+
 
