@@ -177,23 +177,6 @@
   }
   function updateAudioState(){ $('#audioState').textContent = audioUnlocked? '🔊 Audio ready':'🔒 Audio locked'; }
 
-  function bellStrike(duration=2.5){
-    ensureAudio();
-    const now = AC.currentTime;
-    const master = AC.createGain(); master.gain.value = 0.0; master.connect(outputGain);
-
-    // Fundamental + overtones typical of a small meditation bell
-    const partials = [
-      {f:660, a:1.0}, {f:880, a:0.7}, {f:1320, a:0.35}, {f:1760, a:0.20}, {f:2400, a:0.12}
-    ];
-    partials.forEach(p=>{
-      const o = AC.createOscillator(); o.type='sine'; o.frequency.value = p.f;
-      const g = AC.createGain(); g.gain.setValueAtTime(0, now);
-      g.gain.linearRampToValueAtTime(p.a, now+0.01);
-      g.gain.exponentialRampToValueAtTime(1e-4, now+duration);
-      o.connect(g).connect(master); o.start(now); o.stop(now+duration+0.2);
-    });
-
     // Slight pitch bend attack for realism
     const bend = AC.createOscillator(); bend.type='sine'; bend.frequency.setValueAtTime(40, now);
     const bg = AC.createGain(); bg.gain.setValueAtTime(0.002, now);
@@ -213,17 +196,57 @@ function loadBell(){
   bellAudio.preload = "auto";
 }
 
-function bellPlay(){
-  const hit = parseInt($('#strike').value,10);
-  for(let i=0;i<hit;i++){
-    setTimeout(()=>{
-      // 毎回新しいAudioを生成しないと同時再生できないので clone する
-      let a = bellAudio.cloneNode();
-      a.volume = parseFloat($('#volume').value);
-      a.play();
-    }, i*600);
+// ==== mp3 を WebAudio で鳴らす版 ====
+
+// 既存の合成用 bellStrike/bellPlay は使わないので削除 or 退避
+// 代わりに AudioBuffer を使う
+let bellBuffer = null;
+
+// mp3 を読み込み＆デコード（unlock 後に呼ぶ）
+async function loadBellMP3() {
+  ensureAudio(); // AC を用意
+  const res = await fetch('bell.mp3', { cache: 'force-cache' });
+  if (!res.ok) throw new Error('bell.mp3 が読み込めませんでした');
+  const arr = await res.arrayBuffer();
+  bellBuffer = await AC.decodeAudioData(arr);
+}
+
+// 実際に鳴らす。strike(打数)、volume、間隔(秒)はUIから取得
+function bellPlay() {
+  if (!bellBuffer) { console.warn('bellBuffer 未ロード'); return; }
+
+  const hit = parseInt($('#strike').value, 10);
+  const vol = parseFloat($('#volume').value);
+  const gap = 0.6; // 2打目以降の間隔（秒）
+
+  const now = AC.currentTime;
+  for (let i = 0; i < hit; i++) {
+    const src = AC.createBufferSource();
+    src.buffer = bellBuffer;
+
+    // 個別の音量ゲイン
+    const g = AC.createGain();
+    g.gain.value = vol;
+    src.connect(g).connect(AC.destination);
+
+    // ずれにくいように WebAudio の時間でスケジューリング
+    src.start(now + i * gap);
   }
 }
+
+// 既存の「音を解禁」処理に、mp3ロードを追加（1回だけでOK）
+$('#unlockAudio').onclick = async () => {
+  unlockAudio();          // 既存：AudioContext を解禁
+  try {
+    await loadBellMP3();  // mp3 をデコード
+    // 解禁直後に1発鳴らしておくと安心（任意）
+    bellPlay();
+  } catch (e) {
+    alert('ベル音の読み込みに失敗しました。bell.mp3 の配置を確認してください。');
+    console.error(e);
+  }
+};
+
 
 window.addEventListener("load", loadBell);
 
@@ -432,3 +455,4 @@ window.addEventListener("load", loadBell);
 </script>
 </body>
 </html>
+
