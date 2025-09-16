@@ -23,4 +23,440 @@
     label{display:block;font-size:12px;color:var(--muted);margin:8px 0 6px}
     input,select,button,textarea{font:inherit}
     input[type="text"],input[type="number"],select{width:100%;background:#0e141b;color:var(--text);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:10px 12px;outline:none}
-    input:focus,select:focus{border-col
+    input:focus,select:focus{border-color:var(--accent)}
+    .btn{display:inline-flex;align-items:center;gap:8px;border:1px solid rgba(255,255,255,.08);background:#0e141b;color:#var(--text);padding:10px 14px;border-radius:12px;cursor:pointer}
+    .btn:active{transform:translateY(1px)}
+    .btn.primary{background:linear-gradient(180deg,#1a2a3a,#152231);border-color:#234;}
+    .btn.accent{background:linear-gradient(180deg,#0e1e2c,#0a1a25);border-color:#2a3950;color:#bde9ff}
+    .btn.good{background:linear-gradient(180deg,#14301e,#0f2617);border-color:#1f4d2f;color:#c7ffd7}
+    .btn.warn{background:linear-gradient(180deg,#362d13,#2b240f);border-color:#51451a;color:#ffefc1}
+    .btn.danger{background:linear-gradient(180deg,#3a1616,#2d1111);border-color:#5a1f1f;color:#ffd6d6}
+    .btn.small{padding:8px 10px;border-radius:10px;font-size:13px}
+    .btn.block{width:100%;justify-content:center}
+    .controls{display:flex;flex-wrap:wrap;gap:8px}
+    .chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+    .chip{background:#0f1720;border:1px solid rgba(255,255,255,.07);padding:8px 10px;border-radius:999px;font-size:12px;color:#c9d7e3}
+    .list{display:flex;flex-direction:column;gap:10px;margin-top:8px}
+    .item{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;background:#0e141b;border:1px solid rgba(255,255,255,.07);border-radius:12px}
+    .item small{color:var(--muted)}
+    .time-inputs{display:flex;gap:8px}
+    .time-inputs input{width:90px}
+    .hr{height:1px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.08),transparent);margin:12px 0}
+    .status{display:flex;align-items:center;gap:8px;font-size:13px;color:#cfe6f6}
+    .pill{padding:6px 10px;border-radius:999px;border:1px solid rgba(255,255,255,.08);background:#0e141b}
+    .timer{font-feature-settings:"tnum" 1, "ss01" 1; font-variant-numeric:tabular-nums;}
+    .big{font-size:44px;letter-spacing:1px}
+    footer{position:fixed;left:0;right:0;bottom:0;padding:12px 16px;background:linear-gradient(180deg,rgba(0,0,0,0),rgba(0,0,0,.6));backdrop-filter:blur(6px)}
+    .foot{max-width:980px;margin:0 auto;display:flex;gap:10px}
+    .foot .btn{flex:1}
+    .hint{font-size:12px;color:var(--muted);margin-top:8px}
+    .kbd{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:#0f1720;border:1px solid rgba(255,255,255,.12);border-radius:6px;padding:1px 6px}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div>
+        <h1>🧘‍♂️ Meditation Bell</h1>
+        <div class="badge">iPhoneローカル実行 / オフライン対応（音はタップで解禁）</div>
+      </div>
+      <div class="status">
+        <span class="pill" id="audioState">🔒 Audio locked</span>
+        <span class="pill" id="wakeLockState">🌙 Auto-Lock 未防止</span>
+        <span class="pill" id="sessionState">⏳ 待機中</span>
+      </div>
+    </header>
+
+    <div class="row">
+      <div class="col">
+        <div class="card panel">
+          <h2>1) ベル予定（オフセット/絶対時刻）</h2>
+          <label>オフセット追加（開始から）</label>
+          <div class="controls">
+            <div class="time-inputs">
+              <input id="mm" type="number" min="0" step="1" placeholder="分"/>
+              <input id="ss" type="number" min="0" max="59" step="1" placeholder="秒"/>
+            </div>
+            <button class="btn small accent" id="addOffset">＋ 追加</button>
+            <button class="btn small" id="genEvery">⟳ 等間隔 生成</button>
+          </div>
+          <div class="hint">例：<span class="kbd">3</span> 分 <span class="kbd">0</span> 秒 → 開始から3分後に鳴動。等間隔は「間隔(分)・回数」指定。</div>
+
+          <div class="hr"></div>
+          <label>絶対時刻（今日の時計）追加</label>
+          <div class="controls">
+            <input id="absTime" type="time" />
+            <button class="btn small accent" id="addAbs">＋ 追加</button>
+          </div>
+          <div class="hint">例：<span class="kbd">06:30</span> のように入力すると、本日のその時刻に鳴動。</div>
+
+          <div class="hr"></div>
+          <div>
+            <div class="list" id="scheduleList"></div>
+            <div class="controls" style="margin-top:8px">
+              <button class="btn small" id="clearSchedule">クリア</button>
+              <button class="btn small" id="sortSchedule">時刻順に並べ替え</button>
+              <button class="btn small" id="testBell">🔔 テスト</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col">
+        <div class="card panel">
+          <h2>2) プリセット保存 / 読込</h2>
+          <label>プリセット名</label>
+          <input id="presetName" type="text" placeholder="例：朝5分坐禅 + 終了3鐘"/>
+          <div class="controls" style="margin-top:8px">
+            <button class="btn small good" id="savePreset">💾 保存</button>
+          </div>
+          <div class="list" id="presetList"></div>
+          <div class="hint">※ プリセットは「💾 保存」ボタンを押したときだけ更新されます（一覧からの名称変更/削除は不可）。</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="row" style="margin-top:14px">
+      <div class="col">
+        <div class="card panel">
+          <h2>3) セッション</h2>
+          <div class="timer big" id="clock">00:00</div>
+          <div class="chips" id="nextBellInfo"></div>
+          <div class="controls" style="margin-top:10px">
+            <button class="btn primary" id="unlockAudio">🔓 音を解禁</button>
+            <button class="btn good" id="start">▶ 開始</button>
+            <button class="btn warn" id="pause">⏸ 一時停止</button>
+            <button class="btn danger" id="stop">■ 停止</button>
+          </div>
+          <div class="hint">iOSでは画面ロック中はタイマーが遅延/停止する場合があります。必要に応じて <span class="kbd">設定 → 画面表示と明るさ → 自動ロック</span> を「しない」に。対応端末ではWake Lockで画面常時ONにします。</div>
+        </div>
+      </div>
+      <div class="col">
+        <div class="card panel">
+          <h2>ベル音質</h2>
+          <div class="controls">
+            <label>音量</label>
+            <input id="volume" type="range" min="0" max="1" step="0.01" value="0.6"/>
+            <label>残響(秒)</label>
+            <input id="decay" type="range" min="0.2" max="8" step="0.1" value="2.5"/>
+            <label>打数</label>
+            <select id="strike">
+              <option value="1">1回</option>
+              <option value="2">2回（短間隔）</option>
+              <option value="3">3回（短間隔）</option>
+            </select>
+          </div>
+          <div class="chips"><span class="chip">m4a/mp3（WebAudio）</span><span class="chip">ユーザー操作で解禁必須</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    <div class="foot">
+      <button class="btn" id="addToHomeHint">＋ ホーム画面に追加（手順表示）</button>
+      <button class="btn" id="about">ℹ 使い方</button>
+    </div>
+  </footer>
+
+<script>
+(function(){
+  const $  = (q)=>document.querySelector(q);
+  const $$ = (q)=>Array.from(document.querySelectorAll(q));
+  const fmt= (t)=>String(t).padStart(2,'0');
+
+  // ---- Audio (WebAudio) ----
+  let AC; let outputGain; let audioUnlocked = false;
+  function ensureAudio(){
+    if(!AC){ AC = new (window.AudioContext||window.webkitAudioContext)({latencyHint:'interactive'}); }
+    if(!outputGain){ outputGain = AC.createGain(); outputGain.gain.value = parseFloat($('#volume').value); outputGain.connect(AC.destination); }
+  }
+  async function unlockAudio(){
+    ensureAudio();
+    try{ await AC.resume(); }catch(_){}
+    const osc = AC.createOscillator(); const g = AC.createGain(); g.gain.value = 0;
+    osc.connect(g).connect(AC.destination); osc.start(); osc.stop(AC.currentTime+0.01);
+    audioUnlocked = true; updateAudioState();
+  }
+  function updateAudioState(){ $('#audioState').textContent = audioUnlocked? '🔊 Audio ready':'🔒 Audio locked'; }
+
+  // ==== 音源ローダ（m4a優先→mp3 フォールバック / 通常＆最後用） ====
+  let bellMainBuf=null, bellFinalBuf=null;
+  async function loadOne(names){ // names: ['bell_main.m4a','bell_main.mp3'] など
+    ensureAudio();
+    let lastErr=null;
+    for(const name of names){
+      try{
+        const res = await fetch(name, { cache: 'force-cache' });
+        if(!res.ok){ lastErr=new Error(`HTTP ${res.status} for ${name}`); continue; }
+        const arr = await res.arrayBuffer();
+        // Safari安定のためcallback版decodeを使う
+        const buf = await new Promise((resolve,reject)=>{
+          AC.decodeAudioData(arr.slice(0), resolve, e=>reject(e||new Error('decodeAudioData failed')));
+        });
+        return buf;
+      }catch(e){ lastErr=e; }
+    }
+    throw lastErr || new Error('audio load failed');
+  }
+  async function loadBellAudios(){
+    // 置いてあるものだけでOK。片方無ければ片方を流用
+    try{ bellMainBuf  = await loadOne(['bell_main.m4a','bell_main.mp3']); }catch(_){}
+    try{ bellFinalBuf = await loadOne(['bell_final.m4a','bell_final.mp3']); }catch(_){}
+    if(!bellMainBuf && bellFinalBuf){ bellMainBuf = bellFinalBuf; }
+    if(!bellFinalBuf && bellMainBuf){ bellFinalBuf = bellMainBuf; }
+    if(!bellMainBuf || !bellFinalBuf) throw new Error('bell_main / bell_final のどちらも読み込めませんでした');
+  }
+
+  // ---- 再生（最後ベル切替対応） ----
+  function playBuffer(buf){
+    const hit = parseInt($('#strike').value, 10);
+    const vol = parseFloat($('#volume').value);
+    const gap = 0.6;
+    const now = AC.currentTime;
+    for(let i=0;i<hit;i++){
+      const src = AC.createBufferSource();
+      src.buffer = buf;
+      const g = AC.createGain(); g.gain.value = vol;
+      src.connect(g).connect(AC.destination);
+      src.start(now + i*gap);
+    }
+  }
+  function playNormal(){ if(!bellMainBuf){ console.warn('main buffer not loaded'); return; } playBuffer(bellMainBuf); }
+  function playFinal(){  if(!bellFinalBuf){ console.warn('final buffer not loaded'); return; } playBuffer(bellFinalBuf); }
+
+  // ---- Wake Lock (Screen on) ----
+  let wakeLockObj=null;
+  async function requestWakeLock(){
+    try{
+      if('wakeLock' in navigator){
+        wakeLockObj = await navigator.wakeLock.request('screen');
+        wakeLockObj.addEventListener('release',()=>updateWakeLabel());
+        updateWakeLabel();
+      }
+    }catch(e){ updateWakeLabel('failed'); }
+  }
+  function releaseWakeLock(){ if(wakeLockObj){ wakeLockObj.release().catch(()=>{}); wakeLockObj=null; updateWakeLabel(); } }
+  function updateWakeLabel(state){
+    const el=$('#wakeLockState');
+    if(state==='failed'){ el.textContent='⚠ Auto-Lock 防止失敗'; return; }
+    el.textContent = wakeLockObj? '🔆 Auto-Lock 防止中' : '🌙 Auto-Lock 未防止';
+  }
+
+  // ---- Schedule model ----
+  /** { whenMs: epochMillis, label: string, type: 'abs'|'offset' } */
+  let schedule=[];
+  function addOffset(min,sec){
+    const t = Math.max(0,(min|0)*60 + (sec|0));
+    const ms=t*1000;
+    schedule.push({whenMs:ms,label:`+${fmt(min)}:${fmt(sec)}`,type:'offset'});
+    renderSchedule();
+  }
+  function addAbsolute(timeStr){
+    const [H,M] = timeStr.split(':').map(Number);
+    const now = new Date();
+    const dt = new Date(now.getFullYear(), now.getMonth(), now.getDate(), H, M, 0, 0);
+    schedule.push({whenMs:dt.getTime(),label:`${fmt(H)}:${fmt(M)}`,type:'abs'});
+    renderSchedule();
+  }
+  function renderSchedule(){
+    const root = $('#scheduleList'); root.innerHTML='';
+    schedule.forEach((it,idx)=>{
+      const div=document.createElement('div'); div.className='item';
+      const span=document.createElement('div');
+      span.innerHTML = `<b>${it.label}</b> <small>${it.type==='offset'?'オフセット':'絶対時刻'}</small>`;
+      const tools=document.createElement('div');
+      const up=btn('↑','small',()=>{ if(idx>0){ [schedule[idx-1],schedule[idx]]=[schedule[idx],schedule[idx-1]]; renderSchedule(); }});
+      const down=btn('↓','small',()=>{ if(idx<schedule.length-1){ [schedule[idx+1],schedule[idx]]=[schedule[idx],schedule[idx+1]]; renderSchedule(); }});
+      const del=btn('削除','small danger',()=>{ schedule.splice(idx,1); renderSchedule(); });
+      tools.append(up,down,del);
+      div.append(span,tools); root.append(div);
+    });
+    updateNextInfo();
+  }
+  function sortSchedule(){
+    schedule.sort((a,b)=> a.whenMs - b.whenMs );
+    renderSchedule();
+  }
+  function btn(txt, cls, on){ const b=document.createElement('button'); b.className='btn '+cls; b.textContent=txt; b.onclick=on; return b; }
+
+  // ---- Presets (localStorage) ----
+  const KEY='meditation_bell_presets_v1';
+  function loadPresets(){ try{ return JSON.parse(localStorage.getItem(KEY)||'[]'); }catch(e){ return []; } }
+  function savePresets(list){ localStorage.setItem(KEY, JSON.stringify(list)); }
+  function renderPresets(){
+    const list = loadPresets();
+    const root = $('#presetList'); root.innerHTML='';
+    if(!list.length){ root.innerHTML='<div class="item"><small>保存なし</small></div>'; return; }
+    list.forEach((p,idx)=>{
+      const div=document.createElement('div'); div.className='item';
+      const left=document.createElement('div');
+      left.innerHTML=`<b>${p.name}</b><br><small>${p.data.length} 鐘 / ${new Date(p.savedAt).toLocaleString()}</small>`;
+      const tools=document.createElement('div');
+      tools.append(
+        btn('読込','small good',()=>{ schedule = p.data.map(x=>({...x})); renderSchedule(); $('#presetName').value=p.name; })
+      );
+      div.append(left,tools); root.append(div);
+    });
+  }
+
+  $('#savePreset').onclick=()=>{
+    const name = ($('#presetName').value||'無題').trim();
+    const list = loadPresets();
+    const i = list.findIndex(p=>p.name===name);
+    const data = schedule.map(x=>({...x}));
+    const item = {name, data, savedAt: Date.now()};
+    if(i>=0) list[i]=item; else list.unshift(item);
+    savePresets(list); renderPresets();
+  };
+
+  // ---- Settings import/export（据え置き）----
+  $('#exportPreset').onclick=()=>{
+    const payload = JSON.stringify({exportedAt:new Date().toISOString(), schedule, settings:getSettings()}, null, 2);
+    const blob = new Blob([payload], {type:'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = 'meditation_bell_preset.json'; a.click();
+    setTimeout(()=>URL.revokeObjectURL(url), 5000);
+  };
+  $('#importFile')?.addEventListener('change', (e)=>{
+    const f=e.target.files[0]; if(!f) return;
+    const reader = new FileReader();
+    reader.onload=()=>{
+      try{ const obj=JSON.parse(reader.result);
+        if(Array.isArray(obj.schedule)){ schedule = obj.schedule; renderSchedule(); }
+        if(obj.settings){ applySettings(obj.settings); }
+      }catch(err){ alert('JSONの読み込みに失敗しました。'); }
+    };
+    reader.readAsText(f);
+  });
+
+  function getSettings(){ return { volume: parseFloat($('#volume').value), decay: parseFloat($('#decay').value), strike: parseInt($('#strike').value,10) }; }
+  function applySettings(s){ if(s.volume!=null) $('#volume').value=s.volume; if(s.decay!=null) $('#decay').value=s.decay; if(s.strike!=null) $('#strike').value=String(s.strike); if(outputGain) outputGain.gain.value=parseFloat($('#volume').value); }
+
+  // ---- Session Engine ----
+  let running=false, paused=false, startEpoch=0, elapsedBase=0, rafId=null, timers=[], remaining=0;
+
+  function msToClock(ms){ const s=Math.max(0, Math.floor(ms/1000)); return `${fmt(Math.floor(s/60))}:${fmt(s%60)}`; }
+  function nowElapsed(){ return paused? elapsedBase : (elapsedBase + (Date.now()-startEpoch)); }
+  function updateClock(){ if(!running) return; $('#clock').textContent = msToClock(nowElapsed()); rafId = requestAnimationFrame(updateClock); }
+  function setSessionState(txt){ $('#sessionState').textContent = txt; }
+
+  function scheduleTimers(){
+    clearTimers();
+    const now=Date.now();
+    const resolved = schedule.map(it=>{
+      if(it.type==='offset'){ return { at: now + it.whenMs, label: it.label }; }
+      else { return { at: it.whenMs, label: it.label }; }
+    }).filter(x=> x.at >= now ).sort((a,b)=>a.at-b.at);
+
+    remaining = resolved.length;
+    if(!remaining){ updateNextInfo([]); return; }
+
+    resolved.forEach((r,i)=>{
+      const delay = Math.max(0, r.at - now);
+      const isLast = (i === resolved.length-1);
+      const id = setTimeout(()=>{
+        if(isLast){
+          playFinal();
+          finishSession(); // 最後のベルでカウントアップ停止
+        }else{
+          playNormal();
+          updateNextInfo();
+        }
+      }, delay);
+      timers.push(id);
+    });
+
+    updateNextInfo(resolved);
+  }
+
+  function clearTimers(){ timers.forEach(id=>clearTimeout(id)); timers=[]; }
+
+  function finishSession(){
+    // 一度表示を最新化してから停止
+    $('#clock').textContent = msToClock(nowElapsed());
+    running=false; paused=false; cancelAnimationFrame(rafId);
+    clearTimers(); releaseWakeLock(); updateNextInfo([]);
+    setSessionState('✅ 完了');
+  }
+
+  function updateNextInfo(resolved){
+    const root = $('#nextBellInfo'); root.innerHTML='';
+    const now=Date.now();
+    const list = resolved || schedule.map(it=>{
+      if(it.type==='offset'){ return { at: now + it.whenMs, label: it.label }; }
+      else { return { at: it.whenMs, label: it.label }; }
+    }).filter(x=>x.at>=now).sort((a,b)=>a.at-b.at);
+
+    if(!list.length){ root.innerHTML='<span class="chip">次のベル：なし</span>'; return; }
+    const next=list[0];
+    const secs = Math.max(0, Math.round((next.at-now)/1000));
+    root.innerHTML = `<span class="chip">次のベル：${next.label}</span><span class="chip">あと ${fmt(Math.floor(secs/60))}:${fmt(secs%60)}</span><span class="chip">残り ${list.length} 回</span>`;
+  }
+
+  // ---- Controls ----
+  $('#unlockAudio').onclick = async () => {
+    await unlockAudio();
+    try { await loadBellAudios(); playNormal(); }
+    catch (e) {
+      alert(`ベル音の読み込みに失敗しました。\n・bell_main.(m4a|mp3) / bell_final.(m4a|mp3) を同じ階層へ\n・m4aはAAC-LC推奨\n\n詳細: ${String(e)}`);
+      console.error(e);
+    }
+  };
+
+  $('#testBell').onclick = async () => {
+    if(!audioUnlocked) await unlockAudio();
+    if(!bellMainBuf && !bellFinalBuf){
+      try{ await loadBellAudios(); }catch(e){ alert('ベル音の読み込みに失敗'); return; }
+    }
+    playNormal();
+  };
+
+  $('#start').onclick=()=>{
+    if(!audioUnlocked){ alert('最初に「音を解禁」をタップしてください。'); return; }
+    if(!bellMainBuf && !bellFinalBuf){ alert('ベル音が未ロードです。音を解禁→テストで確認してね。'); return; }
+    running=true; paused=false; startEpoch=Date.now(); setSessionState('▶ 計測中'); updateClock(); requestWakeLock(); scheduleTimers();
+  };
+  $('#pause').onclick=()=>{
+    if(!running) return;
+    paused = !paused;
+    if(paused){ elapsedBase += Date.now()-startEpoch; setSessionState('⏸ 一時停止'); }
+    else { startEpoch = Date.now(); setSessionState('▶ 計測中'); requestWakeLock(); updateClock(); }
+  };
+  $('#stop').onclick=()=>{
+    running=false; paused=false; cancelAnimationFrame(rafId);
+    $('#clock').textContent='00:00'; elapsedBase=0; clearTimers(); releaseWakeLock(); updateNextInfo([]);
+    setSessionState('⏹ 停止');
+  };
+
+  // Schedule UI
+  $('#addOffset').onclick=()=>{
+    const m = parseInt($('#mm').value||'0',10); const s=parseInt($('#ss').value||'0',10);
+    if(isNaN(m)||isNaN(s)) return; addOffset(m,s); $('#mm').value=''; $('#ss').value='';
+  };
+  $('#genEvery').onclick=()=>{
+    const minStr = prompt('間隔（分）例: 5'); if(minStr==null) return; const mins=parseFloat(minStr);
+    const countStr= prompt('回数 例: 6'); if(countStr==null) return; const cnt=parseInt(countStr,10);
+    if(!(mins>0 && cnt>0)) return; for(let i=1;i<=cnt;i++){ addOffset(mins*i,0); }
+  };
+  $('#addAbs').onclick=()=>{ const t=$('#absTime').value; if(!t) return; addAbsolute(t); };
+  $('#clearSchedule').onclick=()=>{ if(confirm('スケジュールを全て削除しますか？')){ schedule=[]; renderSchedule(); } };
+  $('#sortSchedule').onclick=sortSchedule;
+
+  // Footer
+  $('#about').onclick=()=>{
+    alert('① ベル時刻を追加（オフセット/絶対）\n② 必要ならプリセット名を付けて💾保存\n③ 「音を解禁」→「開始」。\n※ iOSはバックグラウンド/ロック中は鳴らせません。画面ON推奨。');
+  };
+  $('#addToHomeHint').onclick=()=>{
+    alert('ホーム画面に追加: 共有ボタン → 「ホーム画面に追加」\n追加後はフルスクリーンで起動できます。');
+  };
+
+  // init
+  renderPresets(); renderSchedule(); updateAudioState(); updateWakeLabel();
+
+  // 復帰時のWakeLock復旧
+  document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible' && running && !paused){ requestWakeLock(); } });
+})();
+</script>
+</body>
+</html>
